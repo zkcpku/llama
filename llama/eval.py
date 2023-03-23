@@ -7,78 +7,56 @@ import torch
 
 from llama.tokenizer import Tokenizer
 from llama.model import Transformer
-
+from torch.nn import CrossEntropyLoss
 
 class LLaMAEval:
     def __init__(self, model: Transformer, tokenizer: Tokenizer):
         self.model = model
         self.tokenizer = tokenizer
 
+
     def eval(
         self,
-        inputs,
-        max_gen_len: int,
-        labels = None
-    ) -> Dict[str, float]:
-        """
-        Evaluate the model using the mean_token_loss and next token accuracy metrics on the given inputs and labels.
-        if labels is None, then the model will be evaluated on the inputs themselves.
-        """
-        bsz = len(inputs)
+        prompts: List[str],
+        max_gen_len: int
+    ):
+        bsz = len(prompts)
         params = self.model.params
         assert bsz <= params.max_batch_size, (bsz, params.max_batch_size)
-        
-        # add bos and eos to allign
-        input_tokens = [self.tokenizer.encode(x, bos=True, eos=True) for x in inputs]
-        
-        min_input_size = min([len(t) for t in input_tokens])
-        max_input_size = max([len(t) for t in input_tokens])
+        prompt_tokens = [self.tokenizer.encode(x, bos=True, eos=False) for x in prompts]
 
-        total_len = min(params.max_seq_len, max_gen_len + max_input_size)
+        min_prompt_size = min([len(t) for t in prompt_tokens])
+        max_prompt_size = max([len(t) for t in prompt_tokens])
+
+        total_len = min(params.max_seq_len, max_prompt_size)
 
         tokens = torch.full((bsz, total_len), self.tokenizer.pad_id).cuda().long()
-        for k, t in enumerate(input_tokens):
+        for k, t in enumerate(prompt_tokens):
             tokens[k, : len(t)] = torch.tensor(t).long()
-        input_text_mask = tokens != self.tokenizer.pad_id
-
-        if labels is None:
-            label_tokens = [self.tokenizer.encode(x, bos=True, eos=True) for x in labels]
-            label_tokens = torch.full((bsz, total_len), self.tokenizer.pad_id).cuda().long()
-            for k, t in enumerate(label_tokens):
-                label_tokens[k, : len(t)] = torch.tensor(t).long()
-            label_text_mask = label_tokens != self.tokenizer.pad_id
-        else:
-            # label_tokens is shifted by one from tokens
-            label_tokens = tokens[:, 1:]
-            label_text_mask = input_text_mask[:, 1:]
-        
+        input_text_mask = tokens != self.tokenizer.pad_id # pad token不参与loss计算
         logits = self.model.forward_logits(tokens, 0)
-        # TODO: check dim of logits, suppose [bsz, seq_len, vocab_size]
-        logits = logits[:, :-1, :]
-        logits = logits.reshape(-1, logits.shape[-1])
-        label_tokens = label_tokens.reshape(-1)
-        label_text_mask = label_text_mask.reshape(-1)
-        # mean_token_loss
-        mean_token_loss = torch.nn.functional.cross_entropy(logits, label_tokens, reduction='none')
-        # next token accuracy
-        next_token_acc = torch.argmax(logits, dim=-1) == label_tokens
-        next_token_acc = next_token_acc.float()
+        
+        labels = tokens
+        shift_logits = logits[..., :-1, :].contiguous()
+        shift_labels = labels[..., 1:].contiguous()
+            
+        
+        loss_fct = CrossEntropyLoss()
+        flatten_shift_loss_mask = input_text_mask[..., :-1].contiguous().view(-1)
+        ids = torch.nonzero(flatten_shift_loss_mask).view(-1)
+        loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1))[ids], shift_labels.view(-1)[ids])
+        eval_loss = loss.mean().item() # 平均所有位置上的loss
 
-        mean_token_loss = mean_token_loss * label_text_mask.float()
-        next_token_acc = next_token_acc * label_text_mask.float()
+        next_token_acc_num = shift_logits.view(-1, shift_logits.size(-1))[ids].argmax(dim=1) == shift_labels.view(-1)[ids]
+        nonzero_token_num = shift_labels.view(-1)[ids].size(0)
 
-        token_length = label_text_mask.sum().item()
-
+        perplexity = torch.exp(torch.tensor(eval_loss))
         return {
-            'mean_token_loss': mean_token_loss.sum().item() / token_length,
-            'next_token_acc': next_token_acc.sum().item() / token_length,
-            'token_length': token_length
+            "ppl": perplexity,
+            "NextToken_accnum": next_token_acc_num.sum().item(),
+            "nonzero_token_num": nonzero_token_num, 
         }
-
-
-
-
-
+    
 
     def generate(
         self,

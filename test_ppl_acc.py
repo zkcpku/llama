@@ -13,7 +13,7 @@ from pathlib import Path
 
 from fairscale.nn.model_parallel.initialize import initialize_model_parallel
 
-from llama import ModelArgs, Transformer, Tokenizer, LLaMA
+from llama import ModelArgs, Transformer, Tokenizer, LLaMAEval
 
 
 def setup_model_parallel() -> Tuple[int, int]:
@@ -36,7 +36,7 @@ def load(
     world_size: int,
     max_seq_len: int,
     max_batch_size: int,
-) -> LLaMA:
+) -> LLaMAEval:
     start_time = time.time()
     checkpoints = sorted(Path(ckpt_dir).glob("*.pth"))
     assert world_size == len(
@@ -58,7 +58,7 @@ def load(
     torch.set_default_tensor_type(torch.FloatTensor)
     model.load_state_dict(checkpoint, strict=False)
 
-    generator = LLaMA(model, tokenizer)
+    generator = LLaMAEval(model, tokenizer)
     print(f"Loaded in {time.time() - start_time:.2f} seconds")
     return generator
 
@@ -82,39 +82,16 @@ def main(
     )
 
     prompts = [
-        # For these prompts, the expected answer is the natural continuation of the prompt
-        "I believe the meaning of life is",
-        "Simply put, the theory of relativity states that ",
-        "Building a website can be done in 10 simple steps:\n",
-        # Few shot prompts: https://huggingface.co/blog/few-shot-learning-gpt-neo-and-inference-api
-        """Tweet: "I hate it when my phone battery dies."
-Sentiment: Negative
-###
-Tweet: "My day has been 👍"
-Sentiment: Positive
-###
-Tweet: "This is the link to the article"
-Sentiment: Neutral
-###
-Tweet: "This new music video was incredibile"
-Sentiment:""",
-        """Translate English to French:
-
-sea otter => loutre de mer
-
-peppermint => menthe poivrée
-
-plush girafe => girafe peluche
-
-cheese =>""",
-    ]
-    results = generator.generate(
-        prompts, max_gen_len=256, temperature=temperature, top_p=top_p
+        "I believe the meaning of life is"]
+    
+    results = generator.eval(
+        prompts, max_gen_len=256
     )
+    print(results)
 
-    for result in results:
-        print(result)
-        print("\n==================================\n")
+#     for result in results:
+#         print(result)
+#         print("\n==================================\n")
 
 
 if __name__ == "__main__":

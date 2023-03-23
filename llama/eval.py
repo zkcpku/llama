@@ -21,7 +21,7 @@ class LLaMAEval:
         labels = None
     ) -> Dict[str, float]:
         """
-        Evaluate the model using the ppl and next token accuracy metrics on the given inputs and labels.
+        Evaluate the model using the mean_token_loss and next token accuracy metrics on the given inputs and labels.
         if labels is None, then the model will be evaluated on the inputs themselves.
         """
         bsz = len(inputs)
@@ -58,19 +58,19 @@ class LLaMAEval:
         logits = logits.reshape(-1, logits.shape[-1])
         label_tokens = label_tokens.reshape(-1)
         label_text_mask = label_text_mask.reshape(-1)
-        # ppl
-        ppl = torch.nn.functional.cross_entropy(logits, label_tokens, reduction='none')
+        # mean_token_loss
+        mean_token_loss = torch.nn.functional.cross_entropy(logits, label_tokens, reduction='none')
         # next token accuracy
         next_token_acc = torch.argmax(logits, dim=-1) == label_tokens
         next_token_acc = next_token_acc.float()
 
-        ppl = ppl * label_text_mask.float()
+        mean_token_loss = mean_token_loss * label_text_mask.float()
         next_token_acc = next_token_acc * label_text_mask.float()
 
         token_length = label_text_mask.sum().item()
 
         return {
-            'ppl': ppl.sum().item() / token_length,
+            'mean_token_loss': mean_token_loss.sum().item() / token_length,
             'next_token_acc': next_token_acc.sum().item() / token_length,
             'token_length': token_length
         }

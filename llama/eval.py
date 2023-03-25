@@ -38,7 +38,8 @@ class LLaMAEval:
 
         tokens = torch.full((bsz, total_len), self.tokenizer.pad_id).cuda().long()
         for k, t in enumerate(prompt_tokens):
-            tokens[k, : len(t)] = torch.tensor(t).long()
+            each_len = min(len(t), total_len)
+            tokens[k, : each_len] = torch.tensor(t[:each_len]).long()
 #         tokenizer = self.tokenizer
 #         import ipdb;ipdb.set_trace()
         input_text_mask = tokens != self.tokenizer.pad_id # pad token不参与loss计算 # pad_token == -1

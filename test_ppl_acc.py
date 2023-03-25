@@ -72,7 +72,10 @@ def main(
     top_p: float = 0.95,
     max_seq_len: int = 512,
     max_batch_size: int = 32,
+    test_tmp_bool: bool = True,
 ):
+    print(test_tmp_bool)
+    print(type(test_tmp_bool))
     local_rank, world_size = setup_model_parallel()
     if local_rank > 0:
         sys.stdout = open(os.devnull, "w")

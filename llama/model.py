@@ -115,6 +115,7 @@ class Attention(nn.Module):
         self.cache_v = torch.zeros(
             (args.max_batch_size, args.max_seq_len, self.n_local_heads, self.head_dim)
         ).cuda()
+        self.args = args
 
     def forward(self, x: torch.Tensor, start_pos: int, freqs_cis: torch.Tensor, mask: Optional[torch.Tensor]):
         bsz, seqlen, _ = x.shape
@@ -129,12 +130,14 @@ class Attention(nn.Module):
         self.cache_k = self.cache_k.to(xq)
         self.cache_v = self.cache_v.to(xq)
         
-        self.cache_k = torch.zeros(
-            (args.max_batch_size, args.max_seq_len, self.n_local_heads, self.head_dim)
-        ).cuda()
-        self.cache_v = torch.zeros(
-            (args.max_batch_size, args.max_seq_len, self.n_local_heads, self.head_dim)
-        ).cuda()
+#         self.cache_k = torch.zeros(
+#             (self.args.max_batch_size, self.args.max_seq_len, self.n_local_heads, self.head_dim)
+#         ).cuda()
+#         self.cache_v = torch.zeros(
+#             (self.args.max_batch_size, self.args.max_seq_len, self.n_local_heads, self.head_dim)
+#         ).cuda()
+        self.cache_k.fill_(0)
+        self.cache_v.fill_(0)
 
         self.cache_k[:bsz, start_pos : start_pos + seqlen] = xk
         self.cache_v[:bsz, start_pos : start_pos + seqlen] = xv
@@ -197,7 +200,8 @@ class TransformerBlock(nn.Module):
         self.ffn_norm = RMSNorm(args.dim, eps=args.norm_eps)
 
     def forward(self, x: torch.Tensor, start_pos: int, freqs_cis: torch.Tensor, mask: Optional[torch.Tensor]):
-        h = x + self.attention.forward(self.attention_norm(x), start_pos, freqs_cis, mask)
+        norm_before_attention = self.attention_norm(x)
+        h = x + self.attention.forward(norm_before_attention, start_pos, freqs_cis, mask)
         out = h + self.feed_forward.forward(self.ffn_norm(h))
         return out
 
@@ -242,7 +246,6 @@ class Transformer(nn.Module):
             h = layer(h, start_pos, freqs_cis, mask)
         h = self.norm(h)
         output = self.output(h[:, -1, :])  # only compute last logits
-        output = self.output(h)
         return output.float()
     
     @torch.inference_mode()
@@ -256,7 +259,6 @@ class Transformer(nn.Module):
         if seqlen > 1:
             mask = torch.full((1, 1, seqlen, seqlen), float("-inf"), device=tokens.device)
             mask = torch.triu(mask, diagonal=start_pos + 1).type_as(h)
-
         for layer in self.layers:
             h = layer(h, start_pos, freqs_cis, mask)
         h = self.norm(h)

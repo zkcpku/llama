@@ -81,14 +81,41 @@ def main(
         ckpt_dir, tokenizer_path, local_rank, world_size, max_seq_len, max_batch_size
     )
 
+#     prompts = [
+#         "I believe the meaning of life is",
+#     "I believe the meaning of life"]
     prompts = [
-        "I believe the meaning of life is"]
+        "I believe the meaning of life is",
+    "I believe a meaning of life"]
+    
+#     prompts = [
+#         "I believe the meaning of life is"]
+    
+#     prompts = [
+#         "I believe the meaning of life is"]
+    
     
     results = generator.eval(
-        prompts, max_gen_len=256
+        prompts, max_gen_len=256, return_each_sample=True, not_consider_eos = False
+    )
+    print(results)
+    
+    results = generator.eval(
+        prompts, max_gen_len=256, return_each_sample=False, not_consider_eos = False
+    )
+    print(results)
+    
+    results = generator.eval(
+        prompts, max_gen_len=256, return_each_sample=True, not_consider_eos = True
     )
     print(results)
 
+    
+    
+    results = generator.eval(
+        prompts, max_gen_len=256, return_each_sample=False, not_consider_eos = True
+    )
+    print(results)
 #     for result in results:
 #         print(result)
 #         print("\n==================================\n")

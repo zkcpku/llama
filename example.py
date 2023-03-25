@@ -13,8 +13,8 @@ from pathlib import Path
 
 from fairscale.nn.model_parallel.initialize import initialize_model_parallel
 
-from llama import ModelArgs, Transformer, Tokenizer, LLaMA
-
+from llama import ModelArgs, Transformer, Tokenizer
+from llama import LLaMAEval as LLaMAEval
 
 def setup_model_parallel() -> Tuple[int, int]:
     local_rank = int(os.environ.get("LOCAL_RANK", -1))
@@ -36,7 +36,7 @@ def load(
     world_size: int,
     max_seq_len: int,
     max_batch_size: int,
-) -> LLaMA:
+) -> LLaMAEval:
     start_time = time.time()
     checkpoints = sorted(Path(ckpt_dir).glob("*.pth"))
     assert world_size == len(
@@ -58,7 +58,7 @@ def load(
     torch.set_default_tensor_type(torch.FloatTensor)
     model.load_state_dict(checkpoint, strict=False)
 
-    generator = LLaMA(model, tokenizer)
+    generator = LLaMAEval(model, tokenizer)
     print(f"Loaded in {time.time() - start_time:.2f} seconds")
     return generator
 

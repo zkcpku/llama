@@ -14,6 +14,12 @@ cd /code/llama/;
 torchrun --nproc_per_node 1 test_ppl_acc_for_corpus.py --ckpt_dir /code/llama_weight/7B --tokenizer_path /code/llama_weight/tokenizer.model --max_seq_len 2048 --max_batch_size 4 --corpus_path /code/llama/CSN_python_func_code_string_top1000_norm.json --output_path /model/CSN_pythontop1000_7B.ppl.json --not_consider_eos True 2>&1| tee /code/CSN_pythontop1000_7B.ppl.log;
 ```
 
+```shell
+cd /code/llama/;
+torchrun --nproc_per_node 8 test_ppl_acc_for_corpus.py --ckpt_dir /code/llama_weight/65B --tokenizer_path /code/llama_weight/tokenizer.model --max_seq_len 2048 --max_batch_size 4 --corpus_path /code/llama/CSN_python_func_code_string_top1000_norm.json --output_path /model/CSN_pythontop1000_65B.ppl.json --not_consider_eos True;
+
+```
+
 ### 计算指标
 
 ```shell
